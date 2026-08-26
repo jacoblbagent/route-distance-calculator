@@ -1,32 +1,49 @@
-# React + TypeScript + Vite
+# Route Distance Calculator
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Enter a **Destination** and up to **3 Departure** addresses — instantly get the driving distance and travel time (ETA) for each route, drawn on an interactive map.
 
-Currently, two official plugins are available:
+**🔗 Live demo:** https://jacoblbagent.github.io/route-distance-calculator/
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- 📍 Destination + 3 Departure address inputs
+- 🗺️ **Real driving routes** drawn on a Leaflet map (CARTO tiles), auto-fitted to fit all routes
+- ⏱️ Per-route **distance (km)** and **travel time**, color-coded to match each departure's marker
+- ➕ Running **totals** across all routes
+- 🖱️ **Click anywhere on the map** to set the destination directly
+- 🚦 Two departure pins with distinct colors; destination shown as a grey "D" pin
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the Oxlint configuration
+- **React 19 + Vite + TypeScript**
+- **Leaflet** with CARTO basemaps
+- Free, keyless APIs: **Nominatim** (geocoding + reverse-geocoding) and **OSRM** (driving distance/duration + route geometry)
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Getting Started
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev        # http://localhost:5173
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Build / Deploy
+
+```bash
+npm run build      # outputs to dist/, base set to /route-distance-calculator/
+```
+
+GitHub Pages is configured to serve the `/docs` folder on `main`. To redeploy:
+
+```bash
+npm run build && rm -rf docs && cp -r dist docs
+git add -A && git commit -m "update" && git push
+```
+
+## Project Structure
+
+```
+src/
+  App.tsx              # Inputs, geocoding/routing orchestration, results
+  components/RouteMap.tsx  # Leaflet map + markers + polylines
+  lib/geo.ts           # Nominatim + OSRM logic
+```
