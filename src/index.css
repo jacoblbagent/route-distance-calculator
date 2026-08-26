@@ -91,6 +91,21 @@ body { background: var(--bg); color: var(--text); }
 .ac__label { color: var(--text); word-break: break-word; }
 .ac__empty { padding: 8px 10px; font-size: 13px; color: var(--muted); }
 
+/* Highlight the field that the map click will target. */
+.ac--active input {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
+}
+.pick-status {
+  font-size: 12px;
+  color: var(--muted);
+  background: #eef2ff;
+  border: 1px solid #dbe1f7;
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+.pick-status b { color: var(--accent); }
+
 .departures { display: flex; flex-direction: column; gap: 14px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 

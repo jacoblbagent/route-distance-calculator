@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import RouteMap from "./components/RouteMap";
 import AddressAutocomplete from "./components/AddressAutocomplete";
-import { geocode, reverseGeocode, route, type LatLng, type RouteResult } from "./lib/geo";
+import { reverseGeocode, route, type LatLng, type RouteResult } from "./lib/geo";
 
 const DEPARTURE_COLORS = ["#e11d48", "#2563eb", "#16a34a"];
 const DEPARTURE_COUNT = 3;
@@ -18,33 +18,50 @@ function emptyDepartures(): AddressState[] {
 export default function App() {
   const [destination, setDestination] = useState<AddressState>({ value: "", coords: null });
   const [departures, setDepartures] = useState<AddressState[]>(emptyDepartures);
-  const [results, setResults] = useState<RouteResult[] | null>(null);
-  const [busy, setBusy] = useState(false);
+  // Which field the map click targets: null = destination, 0..2 = departure index.
+  const [activeField, setActiveFieldState] = useState<number | null>(null);
+  const activeFieldRef = useRef<number | null>(null);
+  const [results, setResults] = useState<(RouteResult | null)[]>(Array(DEPARTURE_COUNT).fill(null));
   const [error, setError] = useState<string | null>(null);
 
-  const allFilled = destination.value.trim() !== "" && departures.every((d) => d.value.trim() !== "");
+  // Mirror activeField into a ref so the map-click handler (registered once) sees the latest value.
+  const setActiveField = (v: number | null) => {
+    activeFieldRef.current = v;
+    setActiveFieldState(v);
+  };
 
-  // Result summary shown in the sidebar.
-  const totalKm = useMemo(
-    () => (results ? results.reduce((s, r) => s + r.distanceKm, 0) : 0),
-    [results]
-  );
-  const totalMin = useMemo(
-    () => (results ? results.reduce((s, r) => s + r.durationMin, 0) : 0),
-    [results]
-  );
+  const setDeparture = (i: number, value: string) =>
+    setDepartures((prev) => prev.map((d, idx) => (idx === i ? { value, coords: null } : d)));
 
-  // Map click -> set destination via reverse geocode.
+  const setDepartureCoords = (i: number, value: string, coords: LatLng) =>
+    setDepartures((prev) => prev.map((d, idx) => (idx === i ? { value, coords } : d)));
+
+  // Slots that actually have a computed route (aligned by departure index).
+  const resultEntries = useMemo(
+    () =>
+      departures
+        .map((_, i) => ({ i, r: results[i] }))
+        .filter((x): x is { i: number; r: RouteResult } => !!x.r),
+    [departures, results]
+  );
+  const totalKm = useMemo(() => resultEntries.reduce((s, x) => s + x.r.distanceKm, 0), [resultEntries]);
+  const totalMin = useMemo(() => resultEntries.reduce((s, x) => s + x.r.durationMin, 0), [resultEntries]);
+
+  // Map click -> set the active field (reverse-geocoded), defaulting to destination.
   const handleMapPick = useCallback(async (lat: number, lng: number) => {
-    setBusy(true);
     setError(null);
+    const coords: LatLng = { lat, lng };
+    let label: string;
     try {
-      const label = await reverseGeocode({ lat, lng });
-      setDestination({ value: label, coords: { lat, lng } });
+      label = await reverseGeocode(coords);
     } catch {
-      setDestination({ value: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, coords: { lat, lng } });
-    } finally {
-      setBusy(false);
+      label = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+    const target = activeFieldRef.current;
+    if (target === null) {
+      setDestination({ value: label, coords });
+    } else {
+      setDepartureCoords(target, label, coords);
     }
   }, []);
 
@@ -57,52 +74,50 @@ export default function App() {
     return () => window.removeEventListener("route-map-pick", fn);
   }, [handleMapPick]);
 
-  const setDeparture = (i: number, value: string) =>
-    setDepartures((prev) => prev.map((d, idx) => (idx === i ? { value, coords: null } : d)));
+  // Live routing: recompute whenever destination/departures change.
+  const coordsKey = useMemo(
+    () => JSON.stringify({ destination, departures }),
+    [destination, departures]
+  );
 
-  const setDepartureCoords = (i: number, value: string, coords: LatLng) =>
-    setDepartures((prev) => prev.map((d, idx) => (idx === i ? { value, coords } : d)));
-
-  const handleCalculate = async () => {
-    setBusy(true);
-    setError(null);
-    setResults(null);
-    try {
-      // Geocode destination...
-      const destCoords = destination.coords ?? (await geocode(destination.value.trim()));
-      if (!destCoords) throw new Error(`Couldn't find the destination "${destination.value}".`);
-
-      // Geocode each departure...
-      const geocoded: { state: AddressState; coords: LatLng }[] = [];
-      for (let i = 0; i < departures.length; i++) {
-        const d = departures[i];
-        const coords = d.coords ?? (await geocode(d.value.trim()));
-        if (!coords) throw new Error(`Couldn't find departure ${i + 1} ("${d.value}").`);
-        geocoded.push({ state: d, coords });
-      }
-
-      // Route each departure -> destination (in parallel).
-      const routes = await Promise.all(
-        geocoded.map(({ coords }) => route(coords, destCoords))
-      );
-
-      setDestination((prev) => ({ ...prev, coords: destCoords }));
-      setDepartures((prev) => prev.map((d, i) => ({ ...d, coords: geocoded[i].coords })));
-      setResults(
-        routes.map((r, i) => ({
-          ...r,
-          from: geocoded[i].coords,
-          to: destCoords,
-          originAddress: geocoded[i].state.value,
-          destAddress: destination.value.trim(),
-        }))
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong.");
-    } finally {
-      setBusy(false);
+  useEffect(() => {
+    let cancelled = false;
+    const dest = destination.coords;
+    const next: (RouteResult | null)[] = Array(DEPARTURE_COUNT).fill(null);
+    if (!dest) {
+      setResults(next);
+      return;
     }
-  };
+    const slots = departures
+      .map((d, i) => ({ d, i }))
+      .filter(({ d }) => d.coords);
+    if (slots.length === 0) {
+      setResults(next);
+      return;
+    }
+    void (async () => {
+      try {
+        const routes = await Promise.all(slots.map(({ d }) => route(d.coords!, dest)));
+        if (cancelled) return;
+        routes.forEach((r, k) => {
+          const s = slots[k];
+          next[s.i] = {
+            ...r,
+            from: s.d.coords!,
+            to: dest,
+            originAddress: s.d.value,
+            destAddress: destination.value.trim(),
+          };
+        });
+        setResults(next);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't calculate routes.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [coordsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const determine = (lng: number) =>
     lng >= 0 ? `E ${lng.toFixed(4)}°` : `W ${((-lng)).toFixed(4)}°`;
@@ -114,15 +129,21 @@ export default function App() {
         <h1 className="title">Route Distance Calculator</h1>
         <p className="subtitle">Distance &amp; ETA from each departure to the destination.</p>
 
+        <div className="pick-status">
+          Click map to set: <b>{activeField === null ? "Destination" : `Departure ${activeField + 1}`}</b>
+        </div>
+
         <label className="field">
           <span className="field__label">Destination</span>
           <AddressAutocomplete
             value={destination.value}
             onChange={(v) => setDestination({ value: v, coords: null })}
             onSelect={(v, c) => setDestination({ value: v, coords: c })}
+            onFocus={() => setActiveField(null)}
+            active={activeField === null}
             placeholder="e.g. Asheville, NC"
           />
-          <span className="hint">Tip: click anywhere on the map to set it.</span>
+          <span className="hint">Tip: focus a field, then click the map to set that address.</span>
         </label>
 
         <div className="departures">
@@ -136,6 +157,8 @@ export default function App() {
                 value={d.value}
                 onChange={(v) => setDeparture(i, v)}
                 onSelect={(v, c) => setDepartureCoords(i, v, c)}
+                onFocus={() => setActiveField(i)}
+                active={activeField === i}
                 placeholder="Starting address"
               />
             </label>
@@ -144,15 +167,11 @@ export default function App() {
 
         {error && <div className="error">{error}</div>}
 
-        <button className="calculate" disabled={!allFilled || busy} onClick={handleCalculate}>
-          {busy ? "Calculating…" : "Calculate Distance &amp; Time"}
-        </button>
-
-        {results && (
+        {resultEntries.length > 0 && (
           <div className="results">
             <h2>Results</h2>
             <ul>
-              {results.map((r, i) => (
+              {resultEntries.map(({ i, r }) => (
                 <li key={i} style={{ borderLeftColor: DEPARTURE_COLORS[i] }}>
                   <div className="results__route">
                     <span className="results__color" style={{ background: DEPARTURE_COLORS[i] }} />
@@ -189,14 +208,11 @@ export default function App() {
         <RouteMap
           destination={destination.coords}
           departures={departures.map((d) => d.coords).filter((c): c is LatLng => !!c)}
-          routes={
-            results
-              ? results.map((r, i) => ({
-                  geometry: r.geometry,
-                  color: DEPARTURE_COLORS[i],
-                }))
-              : []
-          }
+          routes={resultEntries.map(({ i, r }) => ({
+            geometry: r.geometry,
+            color: DEPARTURE_COLORS[i],
+            index: i,
+          }))}
         />
       </main>
     </div>

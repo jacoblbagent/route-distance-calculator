@@ -8,7 +8,7 @@ const DEPARTURE_COLORS = ["#e11d48", "#2563eb", "#16a34a"];
 interface RouteMapProps {
   destination: LatLng | null;
   departures: LatLng[]; // aligned with DEPARTURE_COLORS
-  routes: { geometry: [number, number][]; color: string }[];
+  routes: { geometry: [number, number][]; color: string; index: number }[];
 }
 
 export default function RouteMap({ destination, departures, routes }: RouteMapProps) {
@@ -64,13 +64,13 @@ export default function RouteMap({ destination, departures, routes }: RouteMapPr
       });
 
     // Routes first (under markers).
-    routes.forEach((r, i) => {
+    routes.forEach((r) => {
       const line = L.polyline(r.geometry as L.LatLngExpression[], {
         color: r.color,
         weight: 4,
         opacity: 0.85,
       }).addTo(layer);
-      line.bindTooltip(`Departure ${i + 1}`, { direction: "top" });
+      line.bindTooltip(`Departure ${r.index + 1}`, { direction: "top" });
       (r.geometry as [number, number][]).forEach((p) => pts.push(L.latLng(p[0], p[1])));
     });
 

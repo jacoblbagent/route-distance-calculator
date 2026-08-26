@@ -6,17 +6,27 @@ interface Props {
   onChange: (value: string) => void;
   onSelect: (value: string, coords: LatLng) => void;
   placeholder?: string;
+  onFocus?: () => void;
+  /** If true, this field is the current map-click target (highlighted). */
+  active?: boolean;
 }
 
 /**
  * Address input with a dropdown of Nominatim autocomplete suggestions that match
  * the current query. Keyboard-navigable (↑/↓/Enter/Escape); click-outside closes.
  */
-export default function AddressAutocomplete({ value, onChange, onSelect, placeholder }: Props) {
+export default function AddressAutocomplete({
+  value,
+  onChange,
+  onSelect,
+  placeholder,
+  onFocus,
+  active,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
-  const [active, setActive] = useState(0);
+  const [highlighted, setHighlighted] = useState(0);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const seqRef = useRef(0);
 
@@ -36,7 +46,7 @@ export default function AddressAutocomplete({ value, onChange, onSelect, placeho
         const res = await searchAddresses(q);
         if (seq !== seqRef.current) return;
         setSuggestions(res);
-        setActive(0);
+        setHighlighted(0);
         setOpen(res.length > 0);
       } catch {
         if (seq === seqRef.current) setSuggestions([]);
@@ -69,26 +79,27 @@ export default function AddressAutocomplete({ value, onChange, onSelect, placeho
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((a) => (a + 1) % suggestions.length);
+      setHighlighted((a) => (a + 1) % suggestions.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((a) => (a - 1 + suggestions.length) % suggestions.length);
+      setHighlighted((a) => (a - 1 + suggestions.length) % suggestions.length);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      pick(suggestions[active]);
+      pick(suggestions[highlighted]);
     } else if (e.key === "Escape") {
       setOpen(false);
     }
   };
 
   return (
-    <div className="ac" ref={rootRef}>
+    <div className={`ac${active ? " ac--active" : ""}`} ref={rootRef}>
       <input
         value={value}
         onChange={(e) => {
           onChange(e.target.value);
           setOpen(true);
         }}
+        onFocus={() => onFocus?.()}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         autoComplete="off"
@@ -102,13 +113,13 @@ export default function AddressAutocomplete({ value, onChange, onSelect, placeho
             <li
               key={`${s.value}-${i}`}
               role="option"
-              aria-selected={i === active}
-              className={`ac__item${i === active ? " ac__item--active" : ""}`}
+              aria-selected={i === highlighted}
+              className={`ac__item${i === highlighted ? " ac__item--active" : ""}`}
               onMouseDown={(e) => {
                 e.preventDefault();
                 pick(s);
               }}
-              onMouseEnter={() => setActive(i)}
+              onMouseEnter={() => setHighlighted(i)}
             >
               <span className="ac__pin">📍</span>
               <span className="ac__label">{s.value}</span>
