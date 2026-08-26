@@ -57,6 +57,40 @@ body { background: var(--bg); color: var(--text); }
 }
 .hint { font-size: 11px; color: var(--muted); }
 
+/* ---------- Address autocomplete ---------- */
+.ac { position: relative; }
+.ac__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 50;
+}
+.ac__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.ac__item:hover,
+.ac__item--active { background: #eef2ff; }
+.ac__pin { flex-shrink: 0; }
+.ac__label { color: var(--text); word-break: break-word; }
+.ac__empty { padding: 8px 10px; font-size: 13px; color: var(--muted); }
+
 .departures { display: flex; flex-direction: column; gap: 14px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 

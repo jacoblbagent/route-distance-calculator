@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import RouteMap from "./components/RouteMap";
+import AddressAutocomplete from "./components/AddressAutocomplete";
 import { geocode, reverseGeocode, route, type LatLng, type RouteResult } from "./lib/geo";
 
 const DEPARTURE_COLORS = ["#e11d48", "#2563eb", "#16a34a"];
@@ -57,7 +58,10 @@ export default function App() {
   }, [handleMapPick]);
 
   const setDeparture = (i: number, value: string) =>
-    setDepartures((prev) => prev.map((d, idx) => (idx === i ? { ...d, value } : d)));
+    setDepartures((prev) => prev.map((d, idx) => (idx === i ? { value, coords: null } : d)));
+
+  const setDepartureCoords = (i: number, value: string, coords: LatLng) =>
+    setDepartures((prev) => prev.map((d, idx) => (idx === i ? { value, coords } : d)));
 
   const handleCalculate = async () => {
     setBusy(true);
@@ -112,9 +116,10 @@ export default function App() {
 
         <label className="field">
           <span className="field__label">Destination</span>
-          <input
+          <AddressAutocomplete
             value={destination.value}
-            onChange={(e) => setDestination({ ...destination, value: e.target.value })}
+            onChange={(v) => setDestination({ value: v, coords: null })}
+            onSelect={(v, c) => setDestination({ value: v, coords: c })}
             placeholder="e.g. Asheville, NC"
           />
           <span className="hint">Tip: click anywhere on the map to set it.</span>
@@ -127,9 +132,10 @@ export default function App() {
                 <i className="dot" style={{ background: DEPARTURE_COLORS[i] }} />
                 Departure {i + 1}
               </span>
-              <input
+              <AddressAutocomplete
                 value={d.value}
-                onChange={(e) => setDeparture(i, e.target.value)}
+                onChange={(v) => setDeparture(i, v)}
+                onSelect={(v, c) => setDepartureCoords(i, v, c)}
                 placeholder="Starting address"
               />
             </label>

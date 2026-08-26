@@ -16,6 +16,11 @@ export interface RouteResult {
   destAddress: string;
 }
 
+export interface AddressSuggestion {
+  value: string; // display name
+  coords: LatLng;
+}
+
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 const OSRM = "https://router.project-osrm.org/route/v1/driving";
 
@@ -31,6 +36,21 @@ export async function geocode(address: string): Promise<LatLng | null> {
   const data = await getJSON(url);
   if (!Array.isArray(data) || data.length === 0) return null;
   return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+}
+
+/** Search addresses matching `query` via Nominatim. Returns up to `limit` suggestions. */
+export async function searchAddresses(query: string, limit = 6): Promise<AddressSuggestion[]> {
+  const q = query.trim();
+  if (!q) return [];
+  const url = `${NOMINATIM}?format=json&limit=${limit}&q=${encodeURIComponent(q)}`;
+  const data = await getJSON(url);
+  if (!Array.isArray(data)) return [];
+  return data
+    .filter((d) => d && d.lat && d.lon && d.display_name)
+    .map((d) => ({
+      value: d.display_name as string,
+      coords: { lat: parseFloat(d.lat), lng: parseFloat(d.lon) },
+    }));
 }
 
 /**
