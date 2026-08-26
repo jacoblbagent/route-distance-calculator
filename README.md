@@ -16,7 +16,7 @@ Enter a **Destination** and up to **3 Departure** addresses — instantly get th
 ## Tech Stack
 
 - **React 19 + Vite + TypeScript**
-- **Leaflet** with CARTO basemaps
+- **Leaflet** with OpenStreetMap standard tiles (keyless via `referrerPolicy:'origin'`)
 - Free, keyless APIs: **Nominatim** (geocoding + reverse-geocoding) and **OSRM** (driving distance/duration + route geometry)
 
 ## Getting Started

@@ -20,11 +20,15 @@ export default function RouteMap({ destination, departures, routes }: RouteMapPr
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current, { scrollWheelZoom: true });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 20,
-      subdomains: "abcd",
+    // OSM standard tiles: keyless, but OSM's tile policy requires a Referer.
+    // referrerPolicy:'origin' sends the site origin so tiles load in a normal
+    // browser (CARTO's old keyless CDN now needs an API key).
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      subdomains: "abc",
+      referrerPolicy: "origin",
       attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
     map.setView([39.8283, -98.5795], 4); // US overview
     mapRef.current = map;
